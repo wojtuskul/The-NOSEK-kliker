@@ -1,122 +1,158 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NOSEK Kliker</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 50px;
-            background: linear-gradient(to right, #ff9a9e, #fad0c4);
-            color: #333;
-            overflow: hidden;
-        }
-        #counter {
-            font-size: 2.5em;
-            margin: 20px;
-            transition: transform 0.2s ease-in-out;
-            background: white;
-            display: inline-block;
-            padding: 10px 20px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        #click-icon {
-            width: 130px;
-            height: 130px;
-            cursor: pointer;
-            transition: transform 0.2s ease-in-out;
-        }
-        #click-icon:active {
-            transform: scale(1.5) rotate(10deg);
-        }
-        button {
-            font-size: 1.2em;
-            margin: 10px;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.3s, transform 0.2s;
-        }
-        #start { background-color: #4CAF50; }
-        #stop { background-color: #f44336; }
-        #reset { background-color: #008CBA; }
-        
-        button:hover {
-            opacity: 0.8;
-        }
-        button:active {
-            transform: scale(0.9);
-        }
-        .firework {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: yellow;
-            border-radius: 50%;
-            animation: explode 1s ease-out;
-        }
-        @keyframes explode {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(10); opacity: 0; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOSEK Kliker z Rankingiem</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 50px;
+      background: linear-gradient(to right, #ff9a9e, #fad0c4);
+      color: #333;
+      overflow: hidden;
+    }
+    #counter {
+      font-size: 2.5em;
+      margin: 20px;
+      background: white;
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 10px;
+      box-shadow: 0px 4px 8px rgba(0,0,0,0.2);
+    }
+    #click-icon {
+      width: 130px;
+      height: 130px;
+      cursor: pointer;
+      transition: transform 0.2s ease-in-out;
+    }
+    #click-icon:active {
+      transform: scale(1.5) rotate(10deg);
+    }
+    button {
+      font-size: 1.2em;
+      margin: 10px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+    }
+    #start { background-color: #4CAF50; }
+    #stop { background-color: #f44336; }
+    #reset { background-color: #008CBA; }
+    .firework {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: yellow;
+      border-radius: 50%;
+      animation: explode 1s ease-out;
+    }
+    @keyframes explode {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(10); opacity: 0; }
+    }
+  </style>
 </head>
 <body>
-    <h1>KLIKAJ NOSA ABY ZDOBYWAĆ PUNKTY</h1>
-    <div id="counter">0</div>
-    <br>
-    <img id="click-icon" src="icon.ico" alt="Kliknij tutaj">
-    <br>
-    <button id="start">Start</button>
-    <button id="stop">Stop</button>
-    <button id="reset">Reset</button>
+  <h1>KLIKAJ NOSA ABY ZDOBYWAĆ PUNKTY</h1>
+  <div id="counter">0</div><br>
+  <img id="click-icon" src="icon.ico" alt="Kliknij tutaj"><br>
+  <button id="start">Start</button>
+  <button id="stop">Stop</button>
+  <button id="reset">Reset</button>
 
-    <script>
-        let count = 0;
-        let running = false;
-        let counterDisplay = document.getElementById("counter");
-        let icon = document.getElementById("click-icon");
+  <h2>Ranking Online (Top 5)</h2>
+  <ol id="ranking-list">Ładowanie...</ol>
 
-        function createFirework() {
-            let firework = document.createElement("div");
-            firework.classList.add("firework");
-            firework.style.left = Math.random() * window.innerWidth + "px";
-            firework.style.top = Math.random() * window.innerHeight + "px";
-            document.body.appendChild(firework);
-            setTimeout(() => firework.remove(), 1000);
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+    import { getDatabase, ref, push, query, orderByChild, limitToLast, get } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZ9D-a_rbzX2iXSKzXjplPINmUsAuU_bE",
+      authDomain: "baza-do-nosek-kliker.firebaseapp.com",
+      projectId: "baza-do-nosek-kliker",
+      storageBucket: "baza-do-nosek-kliker.firebasestorage.app",
+      messagingSenderId: "686158397381",
+      appId: "1:686158397381:web:c407db3f4e317d9b2d95ac"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let count = 0;
+    let running = false;
+    const counterDisplay = document.getElementById("counter");
+    const icon = document.getElementById("click-icon");
+
+    function updateScoreDisplay() {
+      counterDisplay.textContent = count;
+    }
+
+    function createFirework() {
+      const firework = document.createElement("div");
+      firework.classList.add("firework");
+      firework.style.left = Math.random() * window.innerWidth + "px";
+      firework.style.top = Math.random() * window.innerHeight + "px";
+      document.body.appendChild(firework);
+      setTimeout(() => firework.remove(), 1000);
+    }
+
+    icon.addEventListener("click", function () {
+      if (running) {
+        count++;
+        updateScoreDisplay();
+        counterDisplay.style.transform = "scale(1.5) rotate(-5deg)";
+        setTimeout(() => counterDisplay.style.transform = "scale(1)", 200);
+        if (count % 100 === 0) {
+          for (let i = 0; i < 10; i++) {
+            setTimeout(createFirework, i * 100);
+          }
         }
+      }
+    });
 
-        icon.addEventListener("click", function () {
-            if (running) {
-                count++;
-                counterDisplay.textContent = count;
-                counterDisplay.style.transform = "scale(1.5) rotate(-5deg)";
-                setTimeout(() => counterDisplay.style.transform = "scale(1)", 200);
-                if (count % 100 === 0) {
-                    for (let i = 0; i < 10; i++) {
-                        setTimeout(createFirework, i * 100);
-                    }
-                }
-            }
-        });
+    document.getElementById("start").addEventListener("click", () => running = true);
+    document.getElementById("stop").addEventListener("click", async () => {
+      running = false;
+      let name = prompt("Podaj swój nick:");
+      if (name) {
+        const scoreData = {
+          name: name,
+          score: count,
+          timestamp: Date.now()
+        };
+        await push(ref(db, "ranking"), scoreData);
+        loadRanking();
+      }
+    });
 
-        document.getElementById("start").addEventListener("click", function () {
-            running = true;
-        });
+    document.getElementById("reset").addEventListener("click", () => {
+      count = 0;
+      updateScoreDisplay();
+    });
 
-        document.getElementById("stop").addEventListener("click", function () {
-            running = false;
-        });
+    async function loadRanking() {
+      const rankingRef = query(ref(db, "ranking"), orderByChild("score"), limitToLast(5));
+      const snapshot = await get(rankingRef);
+      const data = [];
+      snapshot.forEach(child => data.push(child.val()));
+      data.sort((a, b) => b.score - a.score); // malejąco
+      const list = document.getElementById("ranking-list");
+      list.innerHTML = "";
+      data.forEach((entry, i) => {
+        const li = document.createElement("li");
+        li.textContent = `${i + 1}. ${entry.name}: ${entry.score}`;
+        list.appendChild(li);
+      });
+    }
 
-        document.getElementById("reset").addEventListener("click", function () {
-            count = 0;
-            counterDisplay.textContent = count;
-        });
-    </script>
+    window.addEventListener("load", loadRanking);
+  </script>
 </body>
 </html>
