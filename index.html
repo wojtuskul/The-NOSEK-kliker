@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NOSEK Kliker z Rankingiem</title>
+  <title>NOSEK Kliker</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -20,7 +20,7 @@
       display: inline-block;
       padding: 10px 20px;
       border-radius: 10px;
-      box-shadow: 0px 4px 8px rgba(0,0,0,0.2);
+      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
     }
     #click-icon {
       width: 130px;
@@ -55,6 +55,13 @@
       0% { transform: scale(1); opacity: 1; }
       100% { transform: scale(10); opacity: 0; }
     }
+    #ranking {
+      margin-top: 40px;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+    }
   </style>
 </head>
 <body>
@@ -62,22 +69,24 @@
   <div id="counter">0</div><br>
   <img id="click-icon" src="icon.ico" alt="Kliknij tutaj"><br>
   <button id="start">Start</button>
-  <button id="stop">Stop</button>
+  <button id="stop">Stop i Zapisz</button>
   <button id="reset">Reset</button>
 
-  <h2>Ranking Online (Top 5)</h2>
-  <ol id="ranking-list">Ładowanie...</ol>
+  <div id="ranking">
+    <h2>Ranking</h2>
+    <ul id="ranking-list"></ul>
+  </div>
 
-  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-    import { getDatabase, ref, push, query, orderByChild, limitToLast, get } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZ9D-a_rbzX2iXSKzXjplPINmUsAuU_bE",
       authDomain: "baza-do-nosek-kliker.firebaseapp.com",
+      databaseURL: "https://baza-do-nosek-kliker-default-rtdb.europe-west1.firebasedatabase.app", // <-- dodaj to!
       projectId: "baza-do-nosek-kliker",
-      storageBucket: "baza-do-nosek-kliker.firebasestorage.app",
+      storageBucket: "baza-do-nosek-kliker.appspot.com",
       messagingSenderId: "686158397381",
       appId: "1:686158397381:web:c407db3f4e317d9b2d95ac"
     };
@@ -89,13 +98,10 @@
     let running = false;
     const counterDisplay = document.getElementById("counter");
     const icon = document.getElementById("click-icon");
-
-    function updateScoreDisplay() {
-      counterDisplay.textContent = count;
-    }
+    const rankingList = document.getElementById("ranking-list");
 
     function createFirework() {
-      const firework = document.createElement("div");
+      let firework = document.createElement("div");
       firework.classList.add("firework");
       firework.style.left = Math.random() * window.innerWidth + "px";
       firework.style.top = Math.random() * window.innerHeight + "px";
@@ -103,56 +109,52 @@
       setTimeout(() => firework.remove(), 1000);
     }
 
-    icon.addEventListener("click", function () {
+    icon.addEventListener("click", () => {
       if (running) {
         count++;
-        updateScoreDisplay();
+        counterDisplay.textContent = count;
         counterDisplay.style.transform = "scale(1.5) rotate(-5deg)";
         setTimeout(() => counterDisplay.style.transform = "scale(1)", 200);
         if (count % 100 === 0) {
-          for (let i = 0; i < 10; i++) {
-            setTimeout(createFirework, i * 100);
-          }
+          for (let i = 0; i < 10; i++) setTimeout(createFirework, i * 100);
         }
       }
     });
 
-    document.getElementById("start").addEventListener("click", () => running = true);
-    document.getElementById("stop").addEventListener("click", async () => {
+    document.getElementById("start").addEventListener("click", () => {
+      running = true;
+    });
+
+    document.getElementById("stop").addEventListener("click", () => {
       running = false;
-      let name = prompt("Podaj swój nick:");
+      const name = prompt("Podaj swoje imię:");
       if (name) {
-        const scoreData = {
-          name: name,
-          score: count,
-          timestamp: Date.now()
-        };
-        await push(ref(db, "ranking"), scoreData);
-        loadRanking();
+        const scoresRef = ref(db, "scores");
+        push(scoresRef, { name, score: count });
+        alert("Wynik zapisany!");
       }
     });
 
     document.getElementById("reset").addEventListener("click", () => {
       count = 0;
-      updateScoreDisplay();
+      counterDisplay.textContent = count;
     });
 
-    async function loadRanking() {
-      const rankingRef = query(ref(db, "ranking"), orderByChild("score"), limitToLast(5));
-      const snapshot = await get(rankingRef);
-      const data = [];
-      snapshot.forEach(child => data.push(child.val()));
-      data.sort((a, b) => b.score - a.score); // malejąco
-      const list = document.getElementById("ranking-list");
-      list.innerHTML = "";
-      data.forEach((entry, i) => {
-        const li = document.createElement("li");
-        li.textContent = `${i + 1}. ${entry.name}: ${entry.score}`;
-        list.appendChild(li);
+    function loadRanking() {
+      const scoresRef = query(ref(db, "scores"), orderByChild("score"), limitToLast(10));
+      onValue(scoresRef, (snapshot) => {
+        const scores = [];
+        snapshot.forEach(child => {
+          scores.push(child.val());
+        });
+        scores.reverse();
+        rankingList.innerHTML = scores.map((s, i) =>
+          `<li><strong>${i + 1}.</strong> ${s.name}: ${s.score}</li>`
+        ).join("");
       });
     }
 
-    window.addEventListener("load", loadRanking);
+    loadRanking();
   </script>
 </body>
 </html>
