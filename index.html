@@ -3,118 +3,238 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NOSEK Kliker z Firebase</title>
+  <title>NOSEK Kliker</title>
   <style>
     body {
       font-family: Arial, sans-serif;
+      background: pink;
+      margin: 0;
+      padding: 0;
       text-align: center;
-      margin: 40px;
-      background: linear-gradient(to right, #ff9a9e, #fad0c4);
     }
-    input, button {
+    #top-bar {
+      display: flex;
+      justify-content: flex-start;
       padding: 10px;
-      margin: 5px;
+      background: #fff0f5;
+      border-bottom: 2px solid #ffb6c1;
+    }
+    #login-form {
+      margin-left: 20px;
+    }
+    #login-form input, #login-form button, #account-type {
+      margin: 3px;
+      padding: 5px;
       font-size: 1em;
     }
-    #score {
+    #counter {
       font-size: 3em;
-      margin: 20px 0;
+      margin: 20px;
+      background: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      display: inline-block;
     }
+    #click-icon {
+      width: 130px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    #click-icon:active {
+      transform: scale(1.5) rotate(10deg);
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      margin: 10px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+    }
+    #start { background-color: #4CAF50; color: white; }
+    #stop { background-color: #f44336; color: white; }
+    #save { background-color: #ff9800; color: white; }
+    #reset { background-color: #2196F3; color: white; }
+    #ranking { margin-top: 30px; }
   </style>
 </head>
 <body>
-  <h1>🔥 NOSEK KLIKER z logowaniem</h1>
 
-  <div>
-    <input id="email" placeholder="Email" />
+<div id="top-bar">
+  <div id="login-form">
+    <select id="account-type">
+      <option value="guest">Gość</option>
+      <option value="custom">Konto lokalne</option>
+      <option value="firebase">Konto Firebase</option>
+    </select><br>
+    <input id="login" type="text" placeholder="Login / Email / Nick" />
     <input id="password" type="password" placeholder="Hasło" />
-    <br>
-    <button id="registerBtn">Zarejestruj</button>
-    <button id="loginBtn">Zaloguj</button>
+    <button onclick="registerUser()">Rejestruj</button>
+    <button onclick="loginUser()">Zaloguj</button>
+    <div id="status"></div>
   </div>
+</div>
 
-  <h2>Twój wynik:</h2>
-  <div id="score">0</div>
+<h1>NOSEK Kliker</h1>
 
-  <button id="clickBtn">Kliknij mnie!</button>
-  <button id="saveBtn">💾 Zapisz wynik</button>
+<div id="counter">0</div><br>
+<img id="click-icon" src="icon.ico" alt="Kliknij tutaj"><br>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
-    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+<button id="start">Start</button>
+<button id="stop">Stop</button>
+<button id="save">Zapisz wynik</button>
+<button id="reset">Reset</button>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAZ9D-a_rbzX2iXSKzXjplPINmUsAuU_bE",
-      authDomain: "baza-do-nosek-kliker.firebaseapp.com",
-      projectId: "baza-do-nosek-kliker",
-      storageBucket: "baza-do-nosek-kliker.appspot.com",
-      messagingSenderId: "686158397381",
-      appId: "1:686158397381:web:c407db3f4e317d9b2d95ac",
-      databaseURL: "https://baza-do-nosek-kliker-default-rtdb.europe-west1.firebasedatabase.app"
-    };
+<div id="ranking">
+  <h2>Ranking</h2>
+  <ul id="ranking-list"></ul>
+</div>
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+  import { getDatabase, ref, set, get, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
 
-    let score = 0;
-    let userId = null;
+  const firebaseConfig = {
+    apiKey: "AIzaSyAZ9D-a_rbzX2iXSKzXjplPINmUsAuU_bE",
+    authDomain: "baza-do-nosek-kliker.firebaseapp.com",
+    projectId: "baza-do-nosek-kliker",
+    storageBucket: "baza-do-nosek-kliker.appspot.com",
+    messagingSenderId: "686158397381",
+    appId: "1:686158397381:web:c407db3f4e317d9b2d95ac",
+    databaseURL: "https://baza-do-nosek-kliker-default-rtdb.europe-west1.firebasedatabase.app"
+  };
 
-    const scoreDisplay = document.getElementById("score");
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
 
-    document.getElementById("registerBtn").onclick = () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+  let count = 0;
+  let running = false;
+  let currentUser = null;
+  let currentType = "guest";
 
-      createUserWithEmailAndPassword(auth, email, password)
-        .then(() => alert("Zarejestrowano!"))
-        .catch(error => alert("Błąd: " + error.message));
-    };
+  const counterDisplay = document.getElementById("counter");
+  const icon = document.getElementById("click-icon");
+  const rankingList = document.getElementById("ranking-list");
 
-    document.getElementById("loginBtn").onclick = () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+  icon.addEventListener("click", () => {
+    if (running) {
+      count++;
+      counterDisplay.textContent = count;
+    }
+  });
 
-      signInWithEmailAndPassword(auth, email, password)
-        .then(() => alert("Zalogowano!"))
-        .catch(error => alert("Błąd logowania: " + error.message));
-    };
+  document.getElementById("start").addEventListener("click", () => running = true);
+  document.getElementById("stop").addEventListener("click", () => running = false);
+  document.getElementById("reset").addEventListener("click", () => {
+    count = 0;
+    counterDisplay.textContent = count;
+  });
 
-    document.getElementById("clickBtn").onclick = () => {
-      score++;
-      scoreDisplay.textContent = score;
-    };
+  document.getElementById("save").addEventListener("click", async () => {
+    if (!currentUser) {
+      const guestNick = prompt("Podaj swój nick:");
+      if (!guestNick) return alert("Nie podano nicku.");
+      localStorage.setItem("localGuestNick", guestNick);
+      localStorage.setItem("localGuestScore", count);
+      await set(ref(db, `guests/${guestNick}`), { login: guestNick, score: count });
+      alert("Wynik zapisany jako gość!");
+      return;
+    }
 
-    document.getElementById("saveBtn").onclick = () => {
-      if (!userId) {
-        alert("Zaloguj się najpierw!");
-        return;
-      }
-      set(ref(db, "scores/" + userId), {
-        score: score
-      }).then(() => {
-        alert("Zapisano wynik!");
-      });
-    };
-
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        userId = user.uid;
-        const userScoreRef = ref(db, "scores/" + userId);
-        get(userScoreRef).then(snapshot => {
-          if (snapshot.exists()) {
-            score = snapshot.val().score || 0;
-            scoreDisplay.textContent = score;
-          } else {
-            score = 0;
-            scoreDisplay.textContent = score;
-          }
-        });
-      } else {
-        userId = null;
-      }
+    const userRef = ref(db, `users/${currentUser.login.replace('.', '_')}`);
+    await set(userRef, {
+      login: currentUser.login,
+      password: currentUser.password || "",
+      score: count
     });
-  </script>
+    alert("Wynik zapisany!");
+  });
+
+  window.registerUser = async function () {
+    const login = document.getElementById("login").value;
+    const password = document.getElementById("password").value;
+    currentType = document.getElementById("account-type").value;
+
+    if (!login || !password) return alert("Wpisz dane");
+
+    if (currentType === "firebase") {
+      try {
+        await createUserWithEmailAndPassword(auth, login, password);
+        alert("Konto Firebase zarejestrowane!");
+      } catch (e) {
+        alert("Błąd: " + e.message);
+      }
+    } else if (currentType === "custom") {
+      await set(ref(db, `users/${login}`), { login, password, score: 0 });
+      alert("Lokalne konto zarejestrowane.");
+    } else {
+      alert("Gość nie wymaga rejestracji.");
+    }
+  };
+
+  window.loginUser = async function () {
+    const login = document.getElementById("login").value;
+    const password = document.getElementById("password").value;
+    currentType = document.getElementById("account-type").value;
+
+    if (!login) return alert("Wpisz login lub nick");
+
+    if (currentType === "firebase") {
+      try {
+        await signInWithEmailAndPassword(auth, login, password);
+        currentUser = { login, password };
+        document.getElementById("status").textContent = `Zalogowano (Firebase): ${login}`;
+        const snap = await get(ref(db, `users/${login.replace('.', '_')}`));
+        if (snap.exists()) {
+          count = snap.val().score || 0;
+          counterDisplay.textContent = count;
+        }
+      } catch (e) {
+        alert("Błąd logowania: " + e.message);
+      }
+    } else if (currentType === "custom") {
+      const snap = await get(ref(db, `users/${login}`));
+      if (snap.exists() && snap.val().password === password) {
+        currentUser = { login, password };
+        count = snap.val().score || 0;
+        counterDisplay.textContent = count;
+        document.getElementById("status").textContent = `Zalogowano (lokalnie): ${login}`;
+      } else {
+        alert("Nieprawidłowe dane.");
+      }
+    } else if (currentType === "guest") {
+      currentUser = null;
+      document.getElementById("status").textContent = `Tryb gościa (${login})`;
+    }
+  };
+
+  // Ranking — użytkownicy i goście
+  function loadRanking() {
+    const usersRef = query(ref(db, "users"), orderByChild("score"), limitToLast(10));
+    const guestsRef = query(ref(db, "guests"), orderByChild("score"), limitToLast(10));
+    let combined = [];
+
+    onValue(usersRef, (snapshot) => {
+      snapshot.forEach(child => {
+        combined.push(child.val());
+      });
+
+      onValue(guestsRef, (guestSnap) => {
+        guestSnap.forEach(child => {
+          combined.push(child.val());
+        });
+
+        combined.sort((a, b) => b.score - a.score);
+        rankingList.innerHTML = combined.slice(0, 10).map((s, i) =>
+          `<li><strong>${i + 1}.</strong> ${s.login}: ${s.score}</li>`
+        ).join("");
+      });
+    });
+  }
+
+  loadRanking();
+</script>
 </body>
 </html>
