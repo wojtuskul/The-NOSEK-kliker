@@ -3,48 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NOSEK Kliker</title>
+  <title>NOSEK Kliker z Firebase</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #ffe; margin: 40px; }
-    #counter { font-size: 3em; margin: 20px; background: white; padding: 10px 20px; border-radius: 10px; display: inline-block; }
-    #click-icon { width: 130px; cursor: pointer; transition: transform 0.2s; }
-    #click-icon:active { transform: scale(1.5) rotate(10deg); }
-    button { padding: 10px 20px; font-size: 1em; margin: 10px; border-radius: 5px; border: none; cursor: pointer; }
-    #start { background-color: #4CAF50; color: white; }
-    #stop { background-color: #f44336; color: white; }
-    #save { background-color: #ff9800; color: white; }
-    #reset { background-color: #2196F3; color: white; }
-    #ranking { margin-top: 30px; }
-    input { margin: 5px; padding: 5px; font-size: 1em; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 40px;
+      background: linear-gradient(to right, #ff9a9e, #fad0c4);
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 1em;
+    }
+    #score {
+      font-size: 3em;
+      margin: 20px 0;
+    }
   </style>
 </head>
 <body>
-
-  <h1>NOSEK Kliker</h1>
+  <h1>🔥 NOSEK KLIKER z logowaniem</h1>
 
   <div>
-    <input id="login" type="text" placeholder="Login (np. piesioznosem)" />
-    <input id="password" type="password" placeholder="Hasło (np. nosolandia123)" />
-    <button onclick="loginUser()">Zaloguj</button>
+    <input id="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Hasło" />
+    <br>
+    <button id="registerBtn">Zarejestruj</button>
+    <button id="loginBtn">Zaloguj</button>
   </div>
 
-  <div id="status"></div>
-  <div id="counter">0</div><br>
-  <img id="click-icon" src="icon.ico" alt="Kliknij tutaj"><br>
+  <h2>Twój wynik:</h2>
+  <div id="score">0</div>
 
-  <button id="start">Start</button>
-  <button id="stop">Stop</button>
-  <button id="save">Zapisz wynik</button>
-  <button id="reset">Reset</button>
-
-  <div id="ranking">
-    <h2>Ranking</h2>
-    <ul id="ranking-list"></ul>
-  </div>
+  <button id="clickBtn">Kliknij mnie!</button>
+  <button id="saveBtn">💾 Zapisz wynik</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-    import { getDatabase, ref, set, get, child, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZ9D-a_rbzX2iXSKzXjplPINmUsAuU_bE",
@@ -57,91 +55,66 @@
     };
 
     const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
     const db = getDatabase(app);
 
-    let count = 0;
-    let running = false;
-    let currentUser = null;
+    let score = 0;
+    let userId = null;
 
-    const counterDisplay = document.getElementById("counter");
-    const icon = document.getElementById("click-icon");
-    const rankingList = document.getElementById("ranking-list");
+    const scoreDisplay = document.getElementById("score");
 
-    icon.addEventListener("click", () => {
-      if (running) {
-        count++;
-        counterDisplay.textContent = count;
-      }
-    });
-
-    document.getElementById("start").addEventListener("click", () => {
-      if (currentUser) running = true;
-      else alert("Najpierw się zaloguj.");
-    });
-
-    document.getElementById("stop").addEventListener("click", () => {
-      running = false;
-    });
-
-    document.getElementById("save").addEventListener("click", async () => {
-      if (!currentUser) return alert("Zaloguj się najpierw!");
-      const userRef = ref(db, `users/${currentUser.login}`);
-      await set(userRef, {
-        login: currentUser.login,
-        password: currentUser.password,
-        score: count
-      });
-      alert("Wynik zapisany!");
-    });
-
-    document.getElementById("reset").addEventListener("click", () => {
-      count = 0;
-      counterDisplay.textContent = count;
-    });
-
-    window.loginUser = async function () {
-      const login = document.getElementById("login").value;
+    document.getElementById("registerBtn").onclick = () => {
+      const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
-      if (!login || !password) return alert("Wprowadź login i hasło.");
 
-      const userRef = ref(db, `users/${login}`);
-      const snapshot = await get(userRef);
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        if (data.password === password) {
-          count = data.score || 0;
-          counterDisplay.textContent = count;
-          currentUser = { login, password };
-          document.getElementById("status").textContent = `Zalogowano jako ${login}`;
-        } else {
-          alert("Nieprawidłowe hasło.");
-        }
-      } else {
-        // Nowy użytkownik
-        await set(userRef, { login, password, score: 0 });
-        currentUser = { login, password };
-        count = 0;
-        counterDisplay.textContent = 0;
-        document.getElementById("status").textContent = `Nowe konto: ${login}`;
-      }
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(() => alert("Zarejestrowano!"))
+        .catch(error => alert("Błąd: " + error.message));
     };
 
-    // Ranking
-    function loadRanking() {
-      const scoresRef = query(ref(db, "users"), orderByChild("score"), limitToLast(10));
-      onValue(scoresRef, (snapshot) => {
-        const scores = [];
-        snapshot.forEach(child => {
-          scores.push(child.val());
-        });
-        scores.sort((a, b) => b.score - a.score);
-        rankingList.innerHTML = scores.map((s, i) =>
-          `<li><strong>${i + 1}.</strong> ${s.login}: ${s.score}</li>`
-        ).join("");
-      });
-    }
+    document.getElementById("loginBtn").onclick = () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
 
-    loadRanking();
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => alert("Zalogowano!"))
+        .catch(error => alert("Błąd logowania: " + error.message));
+    };
+
+    document.getElementById("clickBtn").onclick = () => {
+      score++;
+      scoreDisplay.textContent = score;
+    };
+
+    document.getElementById("saveBtn").onclick = () => {
+      if (!userId) {
+        alert("Zaloguj się najpierw!");
+        return;
+      }
+      set(ref(db, "scores/" + userId), {
+        score: score
+      }).then(() => {
+        alert("Zapisano wynik!");
+      });
+    };
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        userId = user.uid;
+        const userScoreRef = ref(db, "scores/" + userId);
+        get(userScoreRef).then(snapshot => {
+          if (snapshot.exists()) {
+            score = snapshot.val().score || 0;
+            scoreDisplay.textContent = score;
+          } else {
+            score = 0;
+            scoreDisplay.textContent = score;
+          }
+        });
+      } else {
+        userId = null;
+      }
+    });
   </script>
 </body>
 </html>
