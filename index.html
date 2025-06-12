@@ -5,71 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>NOSEK Kliker</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 50px;
-      background: linear-gradient(to right, #ff9a9e, #fad0c4);
-      color: #333;
-      overflow: hidden;
-    }
-    #counter {
-      font-size: 2.5em;
-      margin: 20px;
-      background: white;
-      display: inline-block;
-      padding: 10px 20px;
-      border-radius: 10px;
-      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-    }
-    #click-icon {
-      width: 130px;
-      height: 130px;
-      cursor: pointer;
-      transition: transform 0.2s ease-in-out;
-    }
-    #click-icon:active {
-      transform: scale(1.5) rotate(10deg);
-    }
-    button {
-      font-size: 1.2em;
-      margin: 10px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 5px;
-      color: white;
-      cursor: pointer;
-    }
-    #start { background-color: #4CAF50; }
-    #stop { background-color: #f44336; }
-    #reset { background-color: #008CBA; }
-    .firework {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      background: yellow;
-      border-radius: 50%;
-      animation: explode 1s ease-out;
-    }
-    @keyframes explode {
-      0% { transform: scale(1); opacity: 1; }
-      100% { transform: scale(10); opacity: 0; }
-    }
-    #ranking {
-      margin-top: 40px;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
-    }
+    body { font-family: Arial, sans-serif; text-align: center; background: #ffe; margin: 40px; }
+    #counter { font-size: 3em; margin: 20px; background: white; padding: 10px 20px; border-radius: 10px; display: inline-block; }
+    #click-icon { width: 130px; cursor: pointer; transition: transform 0.2s; }
+    #click-icon:active { transform: scale(1.5) rotate(10deg); }
+    button { padding: 10px 20px; font-size: 1em; margin: 10px; border-radius: 5px; border: none; cursor: pointer; }
+    #start { background-color: #4CAF50; color: white; }
+    #stop { background-color: #f44336; color: white; }
+    #save { background-color: #ff9800; color: white; }
+    #reset { background-color: #2196F3; color: white; }
+    #ranking { margin-top: 30px; }
+    input { margin: 5px; padding: 5px; font-size: 1em; }
   </style>
 </head>
 <body>
-  <h1>KLIKAJ NOSA ABY ZDOBYWAĆ PUNKTY</h1>
+
+  <h1>NOSEK Kliker</h1>
+
+  <div>
+    <input id="login" type="text" placeholder="Login (np. piesioznosem)" />
+    <input id="password" type="password" placeholder="Hasło (np. nosolandia123)" />
+    <button onclick="loginUser()">Zaloguj</button>
+  </div>
+
+  <div id="status"></div>
   <div id="counter">0</div><br>
   <img id="click-icon" src="icon.ico" alt="Kliknij tutaj"><br>
+
   <button id="start">Start</button>
-  <button id="stop">Stop i Zapisz</button>
+  <button id="stop">Stop</button>
+  <button id="save">Zapisz wynik</button>
   <button id="reset">Reset</button>
 
   <div id="ranking">
@@ -79,16 +44,16 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+    import { getDatabase, ref, set, get, child, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZ9D-a_rbzX2iXSKzXjplPINmUsAuU_bE",
       authDomain: "baza-do-nosek-kliker.firebaseapp.com",
-      databaseURL: "https://baza-do-nosek-kliker-default-rtdb.europe-west1.firebasedatabase.app", // <-- dodaj to!
       projectId: "baza-do-nosek-kliker",
       storageBucket: "baza-do-nosek-kliker.appspot.com",
       messagingSenderId: "686158397381",
-      appId: "1:686158397381:web:c407db3f4e317d9b2d95ac"
+      appId: "1:686158397381:web:c407db3f4e317d9b2d95ac",
+      databaseURL: "https://baza-do-nosek-kliker-default-rtdb.europe-west1.firebasedatabase.app"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -96,43 +61,37 @@
 
     let count = 0;
     let running = false;
+    let currentUser = null;
+
     const counterDisplay = document.getElementById("counter");
     const icon = document.getElementById("click-icon");
     const rankingList = document.getElementById("ranking-list");
-
-    function createFirework() {
-      let firework = document.createElement("div");
-      firework.classList.add("firework");
-      firework.style.left = Math.random() * window.innerWidth + "px";
-      firework.style.top = Math.random() * window.innerHeight + "px";
-      document.body.appendChild(firework);
-      setTimeout(() => firework.remove(), 1000);
-    }
 
     icon.addEventListener("click", () => {
       if (running) {
         count++;
         counterDisplay.textContent = count;
-        counterDisplay.style.transform = "scale(1.5) rotate(-5deg)";
-        setTimeout(() => counterDisplay.style.transform = "scale(1)", 200);
-        if (count % 100 === 0) {
-          for (let i = 0; i < 10; i++) setTimeout(createFirework, i * 100);
-        }
       }
     });
 
     document.getElementById("start").addEventListener("click", () => {
-      running = true;
+      if (currentUser) running = true;
+      else alert("Najpierw się zaloguj.");
     });
 
     document.getElementById("stop").addEventListener("click", () => {
       running = false;
-      const name = prompt("Podaj swoje imię:");
-      if (name) {
-        const scoresRef = ref(db, "scores");
-        push(scoresRef, { name, score: count });
-        alert("Wynik zapisany!");
-      }
+    });
+
+    document.getElementById("save").addEventListener("click", async () => {
+      if (!currentUser) return alert("Zaloguj się najpierw!");
+      const userRef = ref(db, `users/${currentUser.login}`);
+      await set(userRef, {
+        login: currentUser.login,
+        password: currentUser.password,
+        score: count
+      });
+      alert("Wynik zapisany!");
     });
 
     document.getElementById("reset").addEventListener("click", () => {
@@ -140,16 +99,44 @@
       counterDisplay.textContent = count;
     });
 
+    window.loginUser = async function () {
+      const login = document.getElementById("login").value;
+      const password = document.getElementById("password").value;
+      if (!login || !password) return alert("Wprowadź login i hasło.");
+
+      const userRef = ref(db, `users/${login}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        if (data.password === password) {
+          count = data.score || 0;
+          counterDisplay.textContent = count;
+          currentUser = { login, password };
+          document.getElementById("status").textContent = `Zalogowano jako ${login}`;
+        } else {
+          alert("Nieprawidłowe hasło.");
+        }
+      } else {
+        // Nowy użytkownik
+        await set(userRef, { login, password, score: 0 });
+        currentUser = { login, password };
+        count = 0;
+        counterDisplay.textContent = 0;
+        document.getElementById("status").textContent = `Nowe konto: ${login}`;
+      }
+    };
+
+    // Ranking
     function loadRanking() {
-      const scoresRef = query(ref(db, "scores"), orderByChild("score"), limitToLast(10));
+      const scoresRef = query(ref(db, "users"), orderByChild("score"), limitToLast(10));
       onValue(scoresRef, (snapshot) => {
         const scores = [];
         snapshot.forEach(child => {
           scores.push(child.val());
         });
-        scores.reverse();
+        scores.sort((a, b) => b.score - a.score);
         rankingList.innerHTML = scores.map((s, i) =>
-          `<li><strong>${i + 1}.</strong> ${s.name}: ${s.score}</li>`
+          `<li><strong>${i + 1}.</strong> ${s.login}: ${s.score}</li>`
         ).join("");
       });
     }
