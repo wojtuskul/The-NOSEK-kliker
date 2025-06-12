@@ -1,11 +1,10 @@
-<!DOCTYPE html>
-<html lang="pl">
+<!DOCTYPE html><html lang="pl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>NOSEK Kliker</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #ffe; margin: 40px; }
+    body { font-family: Arial, sans-serif; text-align: center; background: pink; margin: 40px; }
     #counter { font-size: 3em; margin: 20px; background: white; padding: 10px 20px; border-radius: 10px; display: inline-block; }
     #click-icon { width: 130px; cursor: pointer; transition: transform 0.2s; }
     #click-icon:active { transform: scale(1.5) rotate(10deg); }
@@ -14,37 +13,27 @@
     #stop { background-color: #f44336; color: white; }
     #save { background-color: #ff9800; color: white; }
     #reset { background-color: #2196F3; color: white; }
+    #local-save { background-color: #9C27B0; color: white; }
+    #local-restore { background-color: #607D8B; color: white; }
     #ranking { margin-top: 30px; }
     input { margin: 5px; padding: 5px; font-size: 1em; }
+    #login-container { position: absolute; top: 10px; left: 10px; text-align: left; }
   </style>
 </head>
-<body>
-
-  <h1>NOSEK Kliker</h1>
-
-  <div>
+<body>  <div id="login-container">
     <input id="login" type="text" placeholder="Login (np. piesioznosem)" />
     <input id="password" type="password" placeholder="Hasło (np. nosolandia123)" />
     <button onclick="loginUser()">Zaloguj</button>
-  </div>
-
-  <div id="status"></div>
+  </div>  <h1>NOSEK Kliker</h1>  <div id="status"></div>
   <div id="counter">0</div><br>
-  <img id="click-icon" src="icon.ico" alt="Kliknij tutaj"><br>
-
-  <button id="start">Start</button>
-  <button id="stop">Stop</button>
-  <button id="save">Zapisz wynik</button>
-  <button id="reset">Reset</button>
+  <img id="click-icon" src="icon.ico" alt="Kliknij tutaj"><br><button id="start">Start</button> <button id="stop">Stop</button> <button id="save">Zapisz wynik</button> <button id="reset">Reset</button> <button id="local-save">Zapisz lokalnie</button> <button id="local-restore">Przywróć z przeglądarki</button>
 
   <div id="ranking">
     <h2>Ranking</h2>
     <ul id="ranking-list"></ul>
-  </div>
-
-  <script type="module">
+  </div>  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-    import { getDatabase, ref, set, get, child, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZ9D-a_rbzX2iXSKzXjplPINmUsAuU_bE",
@@ -74,29 +63,54 @@
       }
     });
 
-    document.getElementById("start").addEventListener("click", () => {
-      if (currentUser) running = true;
-      else alert("Najpierw się zaloguj.");
-    });
-
-    document.getElementById("stop").addEventListener("click", () => {
-      running = false;
-    });
+    document.getElementById("start").addEventListener("click", () => running = true);
+    document.getElementById("stop").addEventListener("click", () => running = false);
 
     document.getElementById("save").addEventListener("click", async () => {
-      if (!currentUser) return alert("Zaloguj się najpierw!");
-      const userRef = ref(db, `users/${currentUser.login}`);
-      await set(userRef, {
-        login: currentUser.login,
-        password: currentUser.password,
-        score: count
-      });
-      alert("Wynik zapisany!");
+      const login = document.getElementById("login").value.trim();
+      if (!login) return alert("Podaj login.");
+
+      if (!currentUser) {
+        // Tryb gościa
+        localStorage.setItem("localGuestNick", login);
+        localStorage.setItem("localGuestScore", count);
+        await set(ref(db, `guests/${login}`), { login, score: count });
+        alert("Wynik zapisany jako gość!");
+      } else {
+        const userRef = ref(db, `users/${currentUser.login}`);
+        await set(userRef, {
+          login: currentUser.login,
+          password: currentUser.password,
+          score: count
+        });
+        alert("Wynik zapisany!");
+      }
     });
 
     document.getElementById("reset").addEventListener("click", () => {
       count = 0;
       counterDisplay.textContent = count;
+    });
+
+    document.getElementById("local-save").addEventListener("click", () => {
+      const login = document.getElementById("login").value.trim();
+      if (!login) return alert("Podaj login by zapisać lokalnie.");
+      localStorage.setItem("localGuestNick", login);
+      localStorage.setItem("localGuestScore", count);
+      alert("Zapisano lokalnie.");
+    });
+
+    document.getElementById("local-restore").addEventListener("click", () => {
+      const savedNick = localStorage.getItem("localGuestNick");
+      const savedScore = parseInt(localStorage.getItem("localGuestScore"), 10);
+      if (savedNick && !isNaN(savedScore)) {
+        document.getElementById("login").value = savedNick;
+        count = savedScore;
+        counterDisplay.textContent = count;
+        alert(`Przywrócono wynik: ${savedScore} dla ${savedNick}`);
+      } else {
+        alert("Brak zapisanego wyniku.");
+      }
     });
 
     window.loginUser = async function () {
@@ -117,7 +131,6 @@
           alert("Nieprawidłowe hasło.");
         }
       } else {
-        // Nowy użytkownik
         await set(userRef, { login, password, score: 0 });
         currentUser = { login, password };
         count = 0;
@@ -126,22 +139,16 @@
       }
     };
 
-    // Ranking
     function loadRanking() {
       const scoresRef = query(ref(db, "users"), orderByChild("score"), limitToLast(10));
       onValue(scoresRef, (snapshot) => {
         const scores = [];
-        snapshot.forEach(child => {
-          scores.push(child.val());
-        });
+        snapshot.forEach(child => scores.push(child.val()));
         scores.sort((a, b) => b.score - a.score);
-        rankingList.innerHTML = scores.map((s, i) =>
-          `<li><strong>${i + 1}.</strong> ${s.login}: ${s.score}</li>`
-        ).join("");
+        rankingList.innerHTML = scores.map((s, i) => `<li><strong>${i + 1}.</strong> ${s.login}: ${s.score}</li>`).join("");
       });
     }
 
     loadRanking();
-  </script>
-</body>
+  </script></body>
 </html>
